@@ -10,8 +10,23 @@ RUN corepack enable
 
 WORKDIR /app
 
-# Install Playwright dependencies for Chromium
-RUN apt-get update &&     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends  jq  libnss3     libnspr4     libatk1.0-0     libatk-bridge2.0-0     libcups2     libdrm2     libxkbcommon0     libxcomposite1     libxdamage1     libxfixes3     libxrandr2     libgbm1     libasound2     libpango-1.0-0     libcairo2     libatspi2.0-0     libgtk-3-0     && apt-get clean &&     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+# Install Playwright dependencies for Chromium + Google Cloud CLI
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends  \
+    jq  libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
+    libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 libatspi2.0-0 libgtk-3-0 \
+    curl gnupg \
+    && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+       > /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends google-cloud-cli \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
+# Install gogcli (Google Workspace CLI) — https://github.com/steipete/gogcli
+RUN curl -fsSL https://github.com/steipete/gogcli/releases/latest/download/gogcli_linux_amd64.tar.gz \
+    | tar -xz -C /usr/local/bin gog
 
 ARG OPENCLAW_DOCKER_APT_PACKAGES=""
 RUN if [ -n "$OPENCLAW_DOCKER_APT_PACKAGES" ]; then       apt-get update &&       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $OPENCLAW_DOCKER_APT_PACKAGES &&       apt-get clean &&       rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*;     fi
