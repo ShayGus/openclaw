@@ -13,7 +13,10 @@ vi.mock("../../auto-reply/dispatch.js", async (importOriginal) => {
 });
 
 import { createSignalEventHandler } from "./event-handler.js";
-import { createBaseSignalEventHandlerDeps } from "./event-handler.test-harness.js";
+import {
+  createBaseSignalEventHandlerDeps,
+  createSignalReceiveEvent,
+} from "./event-handler.test-harness.js";
 
 describe("signal createSignalEventHandler inbound contract", () => {
   it("passes a finalized MsgContext to dispatchInboundMessage", async () => {
@@ -27,21 +30,15 @@ describe("signal createSignalEventHandler inbound contract", () => {
       }),
     );
 
-    await handler({
-      event: "receive",
-      data: JSON.stringify({
-        envelope: {
-          sourceNumber: "+15550001111",
-          sourceName: "Alice",
-          timestamp: 1700000000000,
-          dataMessage: {
-            message: "hi",
-            attachments: [],
-            groupInfo: { groupId: "g1", groupName: "Test Group" },
-          },
+    await handler(
+      createSignalReceiveEvent({
+        dataMessage: {
+          message: "hi",
+          attachments: [],
+          groupInfo: { groupId: "g1", groupName: "Test Group" },
         },
       }),
-    });
+    );
 
     expect(capturedCtx).toBeTruthy();
     expectInboundContextContract(capturedCtx!);
@@ -50,5 +47,39 @@ describe("signal createSignalEventHandler inbound contract", () => {
     expect(String(contextWithBody.Body ?? "")).toContain("Alice");
     expect(String(contextWithBody.Body ?? "")).toMatch(/Alice.*:/);
     expect(String(contextWithBody.Body ?? "")).not.toContain("[from:");
+  });
+
+  it("normalizes direct chat To/OriginatingTo targets to canonical Signal ids", async () => {
+    capturedCtx = undefined;
+
+    const handler = createSignalEventHandler(
+      createBaseSignalEventHandlerDeps({
+        // oxlint-disable-next-line typescript/no-explicit-any
+        cfg: { messages: { inbound: { debounceMs: 0 } } } as any,
+        historyLimit: 0,
+      }),
+    );
+
+    await handler(
+      createSignalReceiveEvent({
+        sourceNumber: "+15550002222",
+        sourceName: "Bob",
+        timestamp: 1700000000001,
+        dataMessage: {
+          message: "hello",
+          attachments: [],
+        },
+      }),
+    );
+
+    expect(capturedCtx).toBeTruthy();
+    const context = capturedCtx as unknown as {
+      ChatType?: string;
+      To?: string;
+      OriginatingTo?: string;
+    };
+    expect(context.ChatType).toBe("direct");
+    expect(context.To).toBe("+15550002222");
+    expect(context.OriginatingTo).toBe("+15550002222");
   });
 });
